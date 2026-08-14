@@ -1,42 +1,65 @@
-const express = require('express');
-const users = require('./MOCK_DATA.json');
+const express = require("express");
+const fs = require("fs");
+const users = require("./MOCK_DATA.json");
 
 const app = express();
 const PORT = 8000;
 
+// Middleware - Plugin
+app.use(express.urlencoded({ extended: false }));
+
+app.use((req, res, next) => {
+    fs.appendFile("log.txt", `${Date.now()}: ${req.ip} ${req.method}: ${req.path}\n`, (err, data) => {
+        next();
+    });   
+});
+
+
 // Routes
 app.get("/users", (req, res) => {
-    const html = `
+  const html = `
     <ul>
-        ${users.map(user => `<li>${user.first_name}</li>`).join("")}
+        ${users.map((user) => `<li>${user.first_name}</li>`).join("")}
     </ul>
     `;
-    return res.send(html);
+  return res.send(html);
 });
 
 // REST API
 app.get("/api/users", (req, res) => {
-    return res.json(users);
+  return res.json(users);
 });
 
-app.route("/api/users/:id")
-.get((req, res) => {
+app
+  .route("/api/users/:id")
+  .get((req, res) => {
     const id = Number(req.params.id);
-    const user = users.find(user => user.id === id);
+    const user = users.find((user) => user.id === id);
     return res.json(user);
-})
-.patch((req, res) => {
-    //TODO: Edit the user with id
-    return res.json({status: "Pending"});
-})
-.delete((req, res) => {
-    //TODO: Delete the user with id
-    return res.json({status: "Pending"});
-});
+  })
+  .patch((req, res) => {
+    const id = Number(req.params.id);
+    const userIndex = users.findIndex((user) => user.id === id);
+    users[userIndex] = { ...users[userIndex], ...req.body };
+    fs.writeFile("./MOCK_DATA.json", JSON.stringify(users), (err, data) => {
+      return res.json({ status: "success", id: id });
+    });
+  })
+  .delete((req, res) => {
+    const id = Number(req.params.id);
+    const userIndex = users.findIndex((user) => user.id === id);
+    users.splice(userIndex, 1);
+    fs.writeFile("./MOCK_DATA.json", JSON.stringify(users), (err, data) => {
+      return res.json({ status: "success", id: id });
+    });
+  });
 
 app.post("/api/users", (req, res) => {
-    //TODO: Create new user
-    res.json({status: "pending"})
+  const body = req.body;
+  users.push({ id: users.length + 1, ...body });
+  fs.writeFile("./MOCK_DATA.json", JSON.stringify(users), (err, data) => {
+    return res.json({ status: "success", id: users.length });
+  });
 });
 
 app.listen(PORT, () => console.log(`Server Started at PORT: ${PORT}`));
