@@ -1,65 +1,21 @@
 const express = require("express");
-const fs = require("fs");
-const users = require("./MOCK_DATA.json");
+const { connectMongoDb } = require('./connection');
+
+const { logReqRes } = require("./middlewares");
+
+const userRouter = require('./routes/user');
 
 const app = express();
 const PORT = 8000;
 
+// Connection
+connectMongoDb("mongodb://127.0.0.1:27017/project-01").then(() => console.log('MongoDB Connected!'));
+
 // Middleware - Plugin
 app.use(express.urlencoded({ extended: false }));
-
-app.use((req, res, next) => {
-    fs.appendFile("log.txt", `${Date.now()}: ${req.ip} ${req.method}: ${req.path}\n`, (err, data) => {
-        next();
-    });   
-});
-
+app.use(logReqRes('log.txt'));
 
 // Routes
-app.get("/users", (req, res) => {
-  const html = `
-    <ul>
-        ${users.map((user) => `<li>${user.first_name}</li>`).join("")}
-    </ul>
-    `;
-  return res.send(html);
-});
-
-// REST API
-app.get("/api/users", (req, res) => {
-  return res.json(users);
-});
-
-app
-  .route("/api/users/:id")
-  .get((req, res) => {
-    const id = Number(req.params.id);
-    const user = users.find((user) => user.id === id);
-    return res.json(user);
-  })
-  .patch((req, res) => {
-    const id = Number(req.params.id);
-    const userIndex = users.findIndex((user) => user.id === id);
-    users[userIndex] = { ...users[userIndex], ...req.body };
-    fs.writeFile("./MOCK_DATA.json", JSON.stringify(users), (err, data) => {
-      return res.json({ status: "success", id: id });
-    });
-  })
-  .delete((req, res) => {
-    const id = Number(req.params.id);
-    const userIndex = users.findIndex((user) => user.id === id);
-    users.splice(userIndex, 1);
-    fs.writeFile("./MOCK_DATA.json", JSON.stringify(users), (err, data) => {
-      return res.json({ status: "success", id: id });
-    });
-  });
-
-app.post("/api/users", (req, res) => {
-  const body = req.body;
-  users.push({ id: users.length + 1, ...body });
-  fs.writeFile("./MOCK_DATA.json", JSON.stringify(users), (err, data) => {
-    return res.json({ status: "success", id: users.length });
-  });
-});
+app.use("/api/users", userRouter);
 
 app.listen(PORT, () => console.log(`Server Started at PORT: ${PORT}`));
